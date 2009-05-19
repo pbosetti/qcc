@@ -16,15 +16,14 @@ lcl = Flotr::Data.new(:label => "LCL", :color => "blue")
 
 ewma = QCC::EWMA.new
 p ewma
-ewma.g = 5
+ewma.group_size = 5
 i = 0
 File.open("diameters.txt") do |f|
   f.each_line do |l|
-    a = l.split
-    a.map! {|e| e.to_f}
-    ewma.update a
+    groups = l.split.map {|e| e.to_f}
+    chart = ewma.update(groups)
     cl = ewma.control_limits
-    puts "#{i+=1} #{ewma.last[:xn]}, #{ewma.last[:z]}, #{cl.inspect}"
+    puts "#{i+=1} #{chart[:xn]}, #{chart[:z]}, #{cl.inspect}"
     z << [i, ewma.last[:z]]
     xn << [i, ewma.last[:xn]]
     lcl << [i, cl[0]]

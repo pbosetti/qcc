@@ -37,6 +37,9 @@ module QCC
       @calibrating = true
     end
     
+    alias group_size= g=
+    alias group_size g
+    
     def update(group)
       raise "Groups must be of size #{@g}" unless group.size == @g
       if @last[:xn] and @last[:sn]
