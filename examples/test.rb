@@ -5,7 +5,33 @@
 # reserved.
 
 require "../lib/qcc"
+require "rubygems"
+require "flotr"
 
-ewma = QCC::EWMA.new :L => 2, :lambda => 0.14
-ewma.lambda = 2
+plot = Flotr::Plot.new("EWMA chart")
+z = Flotr::Data.new(:label => "z", :color => "black")
+xn = Flotr::Data.new(:label => "X", :color => "red")
+ucl = Flotr::Data.new(:label => "UCL", :color => "blue")
+lcl = Flotr::Data.new(:label => "LCL", :color => "blue")
+
+ewma = QCC::EWMA.new
 p ewma
+ewma.g = 5
+i = 0
+File.open("diameters.txt") do |f|
+  f.each_line do |l|
+    a = l.split
+    a.map! {|e| e.to_f}
+    ewma.update a
+    cl = ewma.control_limits
+    puts "#{i+=1} #{ewma.last[:xn]}, #{ewma.last[:z]}, #{cl.inspect}"
+    z << [i, ewma.last[:z]]
+    xn << [i, ewma.last[:xn]]
+    lcl << [i, cl[0]]
+    ucl << [i, cl[1]]
+    ewma.calibrating = (i < 25)
+  end
+end
+
+plot << z << lcl << ucl << xn
+plot.show

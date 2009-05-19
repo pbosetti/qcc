@@ -4,31 +4,69 @@
 # Copyright (c) 2009 University of Trento. All rights 
 # reserved.
 
+class Array
+  def extr
+    [self.min, self.max]
+  end
+  
+  def mean
+  	self.inject(0) {|sum, i| sum + i}/self.length.to_f
+  end
+
+  def sd
+  	m=self.mean
+  	begin
+      Math::sqrt(self.inject(0) {|sum, i| sum + (i-m)**2}/(self.length.to_f-1))
+    rescue
+      0.0
+    end
+  end
+end
+
 module QCC
   class EWMA
-    PARS = {:lambda => 0.1, :L => 3, :n => 5}
-    attr_accessor :parameters, :xav, :n
+    attr_accessor :r, :k, :i, :g, :last, :n
+    attr_accessor :calibrating, :ref
     
-    def initialize(pars={})
-      @parameters = PARS.merge pars
-      
+    def initialize(r = 0.2, k = 3.0, g = 3)
+      @r = r
+      @k = k
+      @g = g
+      @i = 0
+      @last = {}
+      @calibrating = true
     end
     
-    def lcl; @xav - self.control_range; end
-    def ucl; @xav + self.control_range; end
-    def control_range
-      l, lambda = @parameters[:lambda], @parameters[:L]
-      l * self.sigma * Math.sqrt(lambda * (1-(1-r)**(2*i))/(n*(2-lambda)))
-    end
-    
-    def method_missing(method, *args)
-      if method.to_s =~ /^(.*)=$/
-        raise NoMethodError, "No attribute #{method}" unless PARS[$1.to_sym]
-        @parameters[$1] = args[0]
+    def update(group)
+      raise "Groups must be of size #{@g}" unless group.size == @g
+      if @last[:xn] and @last[:sn]
+        xn, sn = @last[:xn], @last[:sn]
       else
-        raise NoMethodError, "No attribute #{method}" unless PARS[method.to_sym]
-        @parameters[method]
+        xn, sn = group[0], 0.0
       end
+      group.each_with_index do |x,i|
+        n = @i * @g + i + 1
+        xn = 1.0/n * ((n-1)*xn + x) if n > 1
+        sn = n > 1 ? n/(n-1.0)*(xn - x)**2 + sn : 0.0
+        sd = n > 1 ? Math::sqrt(1.0/(n-1.0)*sn) : nil
+      end
+      @i += 1
+      @n = @i * @g
+      if @last[:z]
+        @last[:z] = @last[:z] + @r*(group.mean - @last[:z])
+      else
+        @last[:z] = xn
+      end
+      if @calibrating
+        @last[:xn], @last[:sn] = xn, sn
+        @last[:sd] = Math::sqrt(1.0/(@n-1)*sn)
+      end
+      @last
+    end
+    
+    def control_limits
+      range = @k * @last[:sd] * Math.sqrt(@r * (1-(1-@r)**(2*@i))/(@g*(2-@r)))
+      [@last[:xn] - range, @last[:xn] + range]
     end
     
   end
